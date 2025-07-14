@@ -1,0 +1,10 @@
+/build/
+/cpp/build/
+amswarm.egg-info/
+/.history/
+/.vscode/
+**/__pycache__/
+**/*.png
+# pixi environments
+.pixi
+*.egg-info
