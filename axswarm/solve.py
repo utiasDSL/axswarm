@@ -116,13 +116,13 @@ def _add_constraints(data: SolverData, settings: SolverSettings) -> SolverData:
 
     # Add constraints. See Ben Sprenger's master thesis for derivations
     q, Q, data = _add_waypoint_pos_constraint(data, settings, t_idx, des_pos, x_0)
-    linear_cost, quad_cost = linear_cost + q, quad_cost + Q
+    # linear_cost, quad_cost = linear_cost + q, quad_cost + Q
     q, Q, data = _add_waypoint_vel_constraint(data, settings, t_idx, des_vel, x_0)
-    linear_cost, quad_cost = linear_cost + q, quad_cost + Q
+    # linear_cost, quad_cost = linear_cost + q, quad_cost + Q
     q, Q, data = _add_waypoint_acc_constraint(data, settings, t_idx, des_acc, x_0)
-    linear_cost, quad_cost = linear_cost + q, quad_cost + Q
+    # linear_cost, quad_cost = linear_cost + q, quad_cost + Q
     q, data = _add_input_continuity_constraint(data, settings, t_idx, x_0)
-    linear_cost = linear_cost + q
+    # linear_cost = linear_cost + q
     data = _add_pos_limit_constraint(data, settings, x_0)
     data = _add_vel_limit_constraint(data, settings, x_0)
     data = _add_acc_limit_constraint(data, settings, x_0)

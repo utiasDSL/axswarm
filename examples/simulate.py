@@ -175,7 +175,7 @@ def main(render: bool = False):
     n_points = 7
     waypoints = generate_waypoints(sim.n_drones, n_points=n_points)
 
-    results = simulate_axswarm(sim, waypoints, render=render)
+    # results = simulate_axswarm(sim, waypoints, render=render)
     results = None
     tstart = time.perf_counter()
     results = simulate_axswarm(sim, waypoints, render=render)

@@ -1,5 +1,5 @@
 SolverSettings:
-  rho_init: 1.3 # Initial value of the penalty parameter
+  rho_init: 10 # Initial value of the penalty parameter
   rho_max: 500_000 # Maximum value of the penalty parameter
   max_iters: 1000 # Maximum number of iterations
 
@@ -11,12 +11,12 @@ SolverSettings:
   max_collisions: 2
 
   # Weights
-  pos_weight: 70000  # Weight of the position tracking objective in the cost
+  pos_weight: 10  # Weight of the position tracking objective in the cost
   vel_weight: 0.  # Weight of the velocity tracking objective in the cost
   acc_weight: 0.  # Weight of the acceleration tracking objective in the cost
   smoothness_weight: 100000  # Weight of the smoothness objective in the cost
-  input_smoothness_weight: 100000  # Weight of the input smoothness objective in the cost
-  input_continuity_weight: 1000  # Weight of the input continuity objective in the cost
+  input_smoothness_weight: 1000  # Weight of the input smoothness objective in the cost
+  input_continuity_weight: 1  # Weight of the input continuity objective in the cost
 
   # Limits
   pos_min: [-2, -2, 0.1]  # Minimum position of the AMSwarm drones
