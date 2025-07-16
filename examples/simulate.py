@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 np.random.seed(0)
-rgbas = np.random.rand(5, 4)
+rgbas = np.random.rand(200, 4)
 rgbas[..., 3] = 1.0
 
 
@@ -49,11 +49,23 @@ def generate_waypoints(n_drones: int, n_points: int = 4, duration_sec: float = 1
     vel = np.zeros_like(pos)
     acc = np.zeros_like(pos)
     assert pos.shape == (n_drones, n_points, 3), f"Shape {pos.shape} != ({n_drones}, {n_points}, 3)"
+    # Load pre-generated waypoints instead. TODO: Remove
+    import pickle
+
+    waypoints_path = Path(__file__).parents[1] / "waypoints.pkl"
+    with open(waypoints_path, "rb") as f:
+        waypoints = pickle.load(f)
+
+    t = np.tile(waypoints[1][:, 0], (n_drones, 1))
+    pos = np.stack([w[:, 1:4] for w in waypoints.values()])
+    vel = np.zeros_like(pos)
+    acc = np.zeros_like(pos)
+
     return {"time": t, "pos": pos, "vel": vel, "acc": acc}
 
 
-def simulate_amswarmpy(sim, waypoints, render=False) -> NDArray:
-    """Run the AMSwarmPy simulation.
+def simulate_axswarm(sim, waypoints, render=False) -> NDArray:
+    """Run the axswarm simulation.
 
     Args:
         sim: Simulation object containing parameters
@@ -153,14 +165,14 @@ def plot_trajectories(sim, waypoints, pos):
 
 
 def main(render: bool = False):
-    sim = Sim(n_drones=5, freq=400, state_freq=80, attitude_freq=400, control="state")
+    sim = Sim(n_drones=6, freq=400, state_freq=80, attitude_freq=400, control="state")
     n_points = 7
     waypoints = generate_waypoints(sim.n_drones, n_points=n_points)
 
-    results = simulate_amswarmpy(sim, waypoints, render=render)
+    results = simulate_axswarm(sim, waypoints, render=render)
     results = None
     tstart = time.perf_counter()
-    results = simulate_amswarmpy(sim, waypoints, render=render)
+    results = simulate_axswarm(sim, waypoints, render=render)
     tstop = time.perf_counter()
     print(f"amswarm solve time: {tstop - tstart:.2f} s")
     sim.close()
@@ -171,5 +183,5 @@ def main(render: bool = False):
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     logging.getLogger("jax").setLevel(logging.WARNING)
-    logger.setLevel(logging.ERROR)
+    logger.setLevel(logging.WARNING)
     fire.Fire(main)

@@ -224,10 +224,10 @@ def _add_collision_constraint(data: SolverData, settings: SolverSettings, x_0: A
         c_c = envelope * (data.matrices.M_p_S_x @ x_0 - data.pos[d].flatten())
         G_c_batched = G_c_batched.at[i].set(envelope[:, None] * data.matrices.M_p_S_u_W_input)
         c_c_batched = c_c_batched.at[i].set(c_c)
-    active = jp.zeros(n_collisions, dtype=bool)
-    active = active.at[:n_collisions].set(min_dist[closest_drones] <= 1.0)
+    mask = jp.zeros(n_collisions, dtype=bool)
+    mask = mask.at[:n_collisions].set(min_dist[closest_drones] <= 1.0)
     constr = PolarInequalityConstraint.init(
-        G_c_batched, c_c_batched, lwr_bound=1.0, tol=settings.collision_tol, active=active
+        G_c_batched, c_c_batched, lwr_bound=1.0, tol=settings.collision_tol, mask=mask
     )
     return data.replace(collision_constraints=constr)
 
