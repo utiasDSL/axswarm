@@ -33,8 +33,15 @@ rgbas[..., 3] = 1.0
 
 def render_solutions(sim, trajectories: list[np.ndarray]):
     for i, trajectory in enumerate(trajectories):
-        draw_points(sim, trajectory, rgba=rgbas[i], size=0.01)
+        draw_points(sim, trajectory, rgba=rgbas[i], size=0.005)
         draw_line(sim, trajectory, rgba=rgbas[i])
+
+
+def render_waypoints(sim, waypoints: dict[str, np.ndarray], t: float, T: float):
+    n_drones = waypoints["pos"].shape[0]
+    t_idx = np.argwhere((waypoints["time"][0] >= t) & (waypoints["time"][0] <= t + T)).flatten()
+    for i in range(n_drones):
+        draw_points(sim, waypoints["pos"][i][t_idx], rgba=rgbas[i], size=0.02)
 
 
 def generate_waypoints(n_drones: int, n_points: int = 4, duration_sec: float = 10.0):
@@ -132,8 +139,7 @@ def simulate_axswarm(sim, waypoints, render=False) -> NDArray:
         sim.step(sim.freq // settings.freq)
         if render:
             render_solutions(sim, solver_data.pos)
-            for i in range(n_drones):
-                draw_points(sim, waypoints["pos"][i], rgba=rgbas[i], size=0.02)
+            render_waypoints(sim, waypoints, t, settings.K / settings.freq)
             sim.render()
 
         trajectories[step] = sim.data.states.pos[0]

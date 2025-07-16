@@ -48,10 +48,11 @@ class InequalityConstraint:
     slack: Array
     mask: Array
     active: Array
-    tol: float = 1e-2
+    tol: float
+    active_range: float
 
     @staticmethod
-    def init(G: Array, h: Array, tol: float = 1e-2) -> InequalityConstraint:
+    def init(G: Array, h: Array, tol: float, active_range: float) -> InequalityConstraint:
         G_T_G = G.T @ G
         G_T_h = G.T @ h
         slack = jp.zeros_like(h)
@@ -59,21 +60,22 @@ class InequalityConstraint:
         assert G.shape[-2] == h.shape[-1]
         assert G_T_G.shape[-1] == G_T_G.shape[-2] == G.shape[-1]
         assert G_T_h.shape[-1] == G.shape[-1]
-        active = jp.ones_like(slack, dtype=bool)
-        return InequalityConstraint(G, h, G_T_G, G_T_h, slack, mask, active, tol)
+        active = jp.ones_like(mask, dtype=bool)
+        return InequalityConstraint(G, h, G_T_G, G_T_h, slack, mask, active, tol, active_range)
 
     @staticmethod
     def quadratic_term(cnstr: InequalityConstraint) -> Array:
-        return cnstr._G_T_G * cnstr.mask
+        return cnstr._G_T_G * cnstr.mask * cnstr.active
 
     @staticmethod
     def linear_term(cnstr: InequalityConstraint) -> Array:
-        return (-cnstr._G_T_h + cnstr.G.T @ cnstr.slack) * cnstr.mask
+        return (-cnstr._G_T_h + cnstr.G.T @ cnstr.slack) * cnstr.mask * cnstr.active
 
     @staticmethod
     def update(cnstr: InequalityConstraint, x: Array) -> InequalityConstraint:
         slack = jp.maximum(0, -cnstr.G @ x + cnstr.h)
-        return cnstr.replace(slack=slack)
+        active = jp.any(cnstr.G @ x - cnstr.h > cnstr.active_range, axis=-1)
+        return cnstr.replace(slack=slack, active=active)
 
     @staticmethod
     def satisfied(cnstr: InequalityConstraint, x: Array) -> bool:
@@ -110,7 +112,9 @@ class PolarInequalityConstraint:
     lwr_bound: float | None
     upr_bound: float | None
     mask: Array
+    active: Array
     tol: float
+    active_range: float
 
     @staticmethod
     def init(
@@ -120,22 +124,28 @@ class PolarInequalityConstraint:
         upr_bound: float | None = None,
         tol: float = 1e-2,
         mask: Array | None = None,
+        active_range: float = 1.0,
     ) -> PolarInequalityConstraint:
         if mask is None:
             mask = jp.ones(shape=G.shape[:-2], dtype=bool)
         else:
             assert mask.shape == G.shape[:-2]
-        return PolarInequalityConstraint(G, c, -c, G.mT @ G, lwr_bound, upr_bound, mask, tol)
+        active = jp.ones_like(mask, dtype=bool)
+        return PolarInequalityConstraint(
+            G, c, -c, G.mT @ G, lwr_bound, upr_bound, mask, active, tol, active_range
+        )
 
     @staticmethod
     @jax.jit
     def quadratic_term(cnstr: PolarInequalityConstraint) -> Array:
-        return cnstr._G_T_G * cnstr.mask[..., None, None]
+        mask, active = cnstr.mask[..., None, None], cnstr.active[..., None, None]
+        return cnstr._G_T_G * mask * active
 
     @staticmethod
     @jax.jit
     def linear_term(cnstr: PolarInequalityConstraint) -> Array:
-        return (-cnstr.G.mT @ cnstr.h[..., None])[..., 0] * cnstr.mask[..., None]
+        mask, active = cnstr.mask[..., None], cnstr.active[..., None]
+        return (-cnstr.G.mT @ cnstr.h[..., None])[..., 0] * mask * active
 
     @staticmethod
     @jax.jit
@@ -157,10 +167,9 @@ class PolarInequalityConstraint:
         else:
             raise ValueError("Must be either upper or lower")
         h = jp.where(mask, h / h_norm * bound, h)
-        cnstr = cnstr.replace(
-            h=jp.where(cnstr.mask[..., None], h.reshape(*h.shape[:-2], -1) - cnstr.c, cnstr.h)
-        )
-        return cnstr
+        h = h.reshape(*h.shape[:-2], -1) - cnstr.c
+        active = jp.any(cnstr.G @ x - h > cnstr.active_range, axis=-1)
+        return cnstr.replace(h=h, active=active)
 
     @staticmethod
     @jax.jit

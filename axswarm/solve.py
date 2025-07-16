@@ -190,14 +190,20 @@ def _add_pos_limit_constraint(data: SolverData, settings: SolverSettings, x_0: A
     upper = jp.tile(settings.pos_max, settings.K + 1) - data.matrices.M_p_S_x @ x_0
     lower = -jp.tile(settings.pos_min, settings.K + 1) + data.matrices.M_p_S_x @ x_0
     h_p = jp.concatenate([upper, lower])
-    constr = InequalityConstraint.init(data.matrices.G_p, h_p, settings.pos_limit_tol)
+    constr = InequalityConstraint.init(
+        data.matrices.G_p, h_p, settings.pos_limit_tol, active_range=-0.5
+    )
     return data.replace(max_pos_constraint=constr)
 
 
 def _add_vel_limit_constraint(data: SolverData, settings: SolverSettings, x_0: Array) -> SolverData:
     c_v = data.matrices.M_v_S_x @ x_0
     constr = PolarInequalityConstraint.init(
-        data.matrices.M_v_S_u_W_input, c_v, upr_bound=settings.vel_max, tol=settings.vel_limit_tol
+        data.matrices.M_v_S_u_W_input,
+        c_v,
+        upr_bound=settings.vel_max,
+        tol=settings.vel_limit_tol,
+        active_range=-0.1,
     )
     return data.replace(max_vel_constraint=constr)
 
@@ -206,7 +212,7 @@ def _add_acc_limit_constraint(data: SolverData, settings: SolverSettings, x_0: A
     c_a = data.matrices.M_a_S_x_prime @ x_0
     G = data.matrices.M_a_S_u_prime_W_input
     constr = PolarInequalityConstraint.init(
-        G, c_a, upr_bound=settings.acc_max, tol=settings.acc_limit_tol
+        G, c_a, upr_bound=settings.acc_max, tol=settings.acc_limit_tol, active_range=-0.1
     )
     return data.replace(max_acc_constraint=constr)
 
@@ -227,7 +233,12 @@ def _add_collision_constraint(data: SolverData, settings: SolverSettings, x_0: A
     mask = jp.zeros(n_collisions, dtype=bool)
     mask = mask.at[:n_collisions].set(min_dist[closest_drones] <= 1.0)
     constr = PolarInequalityConstraint.init(
-        G_c_batched, c_c_batched, lwr_bound=1.0, tol=settings.collision_tol, mask=mask
+        G_c_batched,
+        c_c_batched,
+        lwr_bound=1.0,
+        tol=settings.collision_tol,
+        mask=mask,
+        active_range=-0.25,
     )
     return data.replace(collision_constraints=constr)
 
@@ -260,7 +271,13 @@ def _am_solve(data: SolverData, settings: SolverSettings) -> tuple[bool, int, So
     rho = settings.rho_init
     zeta = data.zeta[data.rank]  # Previously was zero initialized, now uses previous solution
     bregman_mult = jp.zeros(data.quad_cost[data.rank].shape[0])  # Bregman multiplier
-
+    # Update constraints with initial solution
+    data = data.replace(
+        max_pos_constraint=InequalityConstraint.update(data.max_pos_constraint, zeta),
+        max_vel_constraint=PolarInequalityConstraint.update(data.max_vel_constraint, zeta),
+        max_acc_constraint=PolarInequalityConstraint.update(data.max_acc_constraint, zeta),
+        collision_constraints=PolarInequalityConstraint.update(data.collision_constraints, zeta),
+    )
     # Aggregate quadratic and linear terms from all constraints
     Q_cnstr = _quadratic_constraint_costs(data)
     q_cnstr = _linear_constraint_costs(data)
@@ -289,8 +306,9 @@ def _am_solve(data: SolverData, settings: SolverSettings) -> tuple[bool, int, So
                 data.collision_constraints, zeta
             ),
         )
-        # Calculate Bregman multiplier
+        Q_cnstr = _quadratic_constraint_costs(data)
         q_cnstr = _linear_constraint_costs(data)
+        # Calculate Bregman multiplier
         bregman_mult = bregman_mult - 0.5 * (Q_cnstr @ zeta + q_cnstr)
         # Increase penalty parameter
         rho = jp.clip(rho * settings.rho_init, max=settings.rho_max)
