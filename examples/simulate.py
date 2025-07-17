@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import pickle
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -56,18 +57,18 @@ def generate_waypoints(n_drones: int, n_points: int = 4, duration_sec: float = 1
     vel = np.zeros_like(pos)
     acc = np.zeros_like(pos)
     assert pos.shape == (n_drones, n_points, 3), f"Shape {pos.shape} != ({n_drones}, {n_points}, 3)"
-    # Load pre-generated waypoints instead. TODO: Remove
-    import pickle
+    return {"time": t, "pos": pos, "vel": vel, "acc": acc}
 
-    waypoints_path = Path(__file__).parents[1] / "waypoints.pkl"
-    with open(waypoints_path, "rb") as f:
+
+def load_waypoints(path: Path) -> dict[str, np.ndarray]:
+    with open(path, "rb") as f:
         waypoints = pickle.load(f)
 
+    n_drones = waypoints[next(iter(waypoints))].shape[0]
     t = np.tile(waypoints[1][:, 0], (n_drones, 1))
     pos = np.stack([w[:, 1:4] for w in waypoints.values()])
     vel = np.zeros_like(pos)
     acc = np.zeros_like(pos)
-
     return {"time": t, "pos": pos, "vel": vel, "acc": acc}
 
 
@@ -174,8 +175,10 @@ def main(render: bool = False):
     sim = Sim(n_drones=6, freq=400, state_freq=80, attitude_freq=400, control="state")
     n_points = 7
     waypoints = generate_waypoints(sim.n_drones, n_points=n_points)
+    # path = Path(__file__).parents[1] / "waypoints.pkl"
+    # waypoints = load_waypoints(path)
 
-    # results = simulate_axswarm(sim, waypoints, render=render)
+    results = simulate_axswarm(sim, waypoints, render=render)
     results = None
     tstart = time.perf_counter()
     results = simulate_axswarm(sim, waypoints, render=render)
