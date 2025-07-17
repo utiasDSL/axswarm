@@ -74,7 +74,10 @@ class InequalityConstraint:
     @staticmethod
     def update(cnstr: InequalityConstraint, x: Array) -> InequalityConstraint:
         slack = jp.maximum(0, -cnstr.G @ x + cnstr.h)
-        active = jp.any(cnstr.G @ x - cnstr.h > cnstr.active_range, axis=-1)
+        # We only activate a constraint if the normalized distance to the boundary is greater than
+        # active_range
+        norm = jp.clip(jp.abs(cnstr.h), min=1e-6)
+        active = jp.any(cnstr.G @ x / norm - 1 > cnstr.active_range, axis=-1)
         return cnstr.replace(slack=slack, active=active)
 
     @staticmethod
@@ -168,7 +171,8 @@ class PolarInequalityConstraint:
             raise ValueError("Must be either upper or lower")
         h = jp.where(mask, h / h_norm * bound, h)
         h = h.reshape(*h.shape[:-2], -1) - cnstr.c
-        active = jp.any(cnstr.G @ x - h > cnstr.active_range, axis=-1)
+        norm = jp.clip(jp.abs(h), min=1e-6)
+        active = jp.any(cnstr.G @ x / norm - 1 > cnstr.active_range, axis=-1)
         return cnstr.replace(h=h, active=active)
 
     @staticmethod

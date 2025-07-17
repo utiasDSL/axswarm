@@ -116,13 +116,17 @@ def _add_constraints(data: SolverData, settings: SolverSettings) -> SolverData:
 
     # Add constraints. See Ben Sprenger's master thesis for derivations
     q, Q, data = _add_waypoint_pos_constraint(data, settings, t_idx, des_pos, x_0)
-    # linear_cost, quad_cost = linear_cost + q, quad_cost + Q
+    if q is not None and Q is not None:
+        linear_cost, quad_cost = linear_cost + q, quad_cost + Q
     q, Q, data = _add_waypoint_vel_constraint(data, settings, t_idx, des_vel, x_0)
-    # linear_cost, quad_cost = linear_cost + q, quad_cost + Q
+    if q is not None and Q is not None:
+        linear_cost, quad_cost = linear_cost + q, quad_cost + Q
     q, Q, data = _add_waypoint_acc_constraint(data, settings, t_idx, des_acc, x_0)
-    # linear_cost, quad_cost = linear_cost + q, quad_cost + Q
+    if q is not None and Q is not None:
+        linear_cost, quad_cost = linear_cost + q, quad_cost + Q
     q, data = _add_input_continuity_constraint(data, settings, t_idx, x_0)
-    # linear_cost = linear_cost + q
+    if q is not None:
+        linear_cost = linear_cost + q
     data = _add_pos_limit_constraint(data, settings, x_0)
     data = _add_vel_limit_constraint(data, settings, x_0)
     data = _add_acc_limit_constraint(data, settings, x_0)
@@ -134,55 +138,63 @@ def _add_constraints(data: SolverData, settings: SolverSettings) -> SolverData:
 
 def _add_waypoint_pos_constraint(
     data: SolverData, settings: SolverSettings, t_idx: Array, des_pos: Array, x_0: Array
-) -> tuple[Array, Array, SolverData]:
+) -> tuple[Array | None, Array | None, SolverData]:
     G_wp = data.matrices.M_p_S_u_W_input[t_idx]
     h_wp = des_pos - data.matrices.M_p_S_x[t_idx] @ x_0
-    q = -2 * settings.pos_weight * G_wp.T @ h_wp
-    Q = 2 * settings.pos_weight * G_wp.T @ G_wp
-    if settings.pos_constraints:
+    q, Q = None, None
+    if settings.pos_constraints == "hard":
         data = data.replace(
             pos_constraint=EqualityConstraint.init(G_wp, h_wp, settings.waypoints_pos_tol)
         )
+    elif settings.pos_constraints == "soft":
+        q = -2 * settings.pos_weight * G_wp.T @ h_wp
+        Q = 2 * settings.pos_weight * G_wp.T @ G_wp
     return q, Q, data
 
 
 def _add_waypoint_vel_constraint(
     data: SolverData, settings: SolverSettings, t_idx: Array, des_vel: Array, x_0: Array
-) -> tuple[Array, Array, SolverData]:
+) -> tuple[Array | None, Array | None, SolverData]:
     G_wv = data.matrices.M_v_S_u_W_input[t_idx]
     h_wv = des_vel - data.matrices.M_v_S_x[t_idx] @ x_0
-    q = -2 * settings.vel_weight * G_wv.T @ h_wv
-    Q = 2 * settings.vel_weight * G_wv.T @ G_wv
-    if settings.vel_constraints:
+    q, Q = None, None
+    if settings.vel_constraints == "hard":
         constr = EqualityConstraint.init(G_wv, h_wv, settings.waypoints_vel_tol)
         data = data.replace(vel_constraint=constr)
+    elif settings.vel_constraints == "soft":
+        q = -2 * settings.vel_weight * G_wv.T @ h_wv
+        Q = 2 * settings.vel_weight * G_wv.T @ G_wv
     return q, Q, data
 
 
 def _add_waypoint_acc_constraint(
     data: SolverData, settings: SolverSettings, t_idx: Array, des_acc: Array, x_0: Array
-) -> tuple[Array, Array, SolverData]:
+) -> tuple[Array | None, Array | None, SolverData]:
     G_wa = data.matrices.M_a_S_u_prime_W_input[t_idx]
     h_wa = des_acc - data.matrices.M_a_S_x_prime[t_idx] @ x_0
-    q = -2 * settings.acc_weight * G_wa.T @ h_wa
-    Q = 2 * settings.acc_weight * G_wa.T @ G_wa
-    if settings.acc_constraints:
+    q, Q = None, None
+    if settings.acc_constraints == "hard":
         constr = EqualityConstraint.init(G_wa, h_wa, settings.waypoints_acc_tol)
         data = data.replace(acc_constraint=constr)
+    elif settings.acc_constraints == "soft":
+        q = -2 * settings.acc_weight * G_wa.T @ h_wa
+        Q = 2 * settings.acc_weight * G_wa.T @ G_wa
     return q, Q, data
 
 
 def _add_input_continuity_constraint(
     data: SolverData, settings: SolverSettings, t_idx: Array, x_0: Array
-) -> tuple[Array, SolverData]:
+) -> tuple[Array | None, SolverData]:
     u_0 = data.u_pos[data.rank, 0]
     u_dot_0 = data.u_vel[data.rank, 0]
     u_ddot_0 = data.u_acc[data.rank, 0]
     h_u = jp.concatenate([u_0, u_dot_0, u_ddot_0])
-    q = -2 * settings.input_continuity_weight * data.matrices.G_u.T @ h_u
-    if settings.input_continuity_constraints:
-        constr = EqualityConstraint.init(data.matrices.G_u, h_u, settings.input_continuity_tol)
-        data = data.replace(input_continuity_constraint=constr)
+    q = None
+    if settings.input_continuity_constraints == "hard":
+        cnstr = EqualityConstraint.init(data.matrices.G_u, h_u, settings.input_continuity_tol)
+        data = data.replace(input_continuity_constraint=cnstr)
+    elif settings.input_continuity_constraints == "soft":
+        q = -2 * settings.input_continuity_weight * data.matrices.G_u.T @ h_u
     return q, data
 
 
@@ -191,7 +203,7 @@ def _add_pos_limit_constraint(data: SolverData, settings: SolverSettings, x_0: A
     lower = -jp.tile(settings.pos_min, settings.K + 1) + data.matrices.M_p_S_x @ x_0
     h_p = jp.concatenate([upper, lower])
     constr = InequalityConstraint.init(
-        data.matrices.G_p, h_p, settings.pos_limit_tol, active_range=-0.5
+        data.matrices.G_p, h_p, settings.pos_limit_tol, active_range=-0.25
     )
     return data.replace(max_pos_constraint=constr)
 
@@ -203,7 +215,7 @@ def _add_vel_limit_constraint(data: SolverData, settings: SolverSettings, x_0: A
         c_v,
         upr_bound=settings.vel_max,
         tol=settings.vel_limit_tol,
-        active_range=-0.1,
+        active_range=-0.25,
     )
     return data.replace(max_vel_constraint=constr)
 
@@ -212,7 +224,7 @@ def _add_acc_limit_constraint(data: SolverData, settings: SolverSettings, x_0: A
     c_a = data.matrices.M_a_S_x_prime @ x_0
     G = data.matrices.M_a_S_u_prime_W_input
     constr = PolarInequalityConstraint.init(
-        G, c_a, upr_bound=settings.acc_max, tol=settings.acc_limit_tol, active_range=-0.1
+        G, c_a, upr_bound=settings.acc_max, tol=settings.acc_limit_tol, active_range=-0.25
     )
     return data.replace(max_acc_constraint=constr)
 
@@ -310,8 +322,9 @@ def _am_solve(data: SolverData, settings: SolverSettings) -> tuple[bool, int, So
         q_cnstr = _linear_constraint_costs(data)
         # Calculate Bregman multiplier
         bregman_mult = bregman_mult - 0.5 * (Q_cnstr @ zeta + q_cnstr)
-        # Increase penalty parameter
-        rho = jp.clip(rho * settings.rho_init, max=settings.rho_max)
+        # Increase penalty parameter. The factor 5.0 is a heuristic, other scheduling schemes might
+        # improve performance.
+        rho = jp.clip(rho * 5.0, max=settings.rho_max)
         return i + 1, zeta, rho, bregman_mult, q_cnstr, Q_cnstr, data, settings
 
     # Compiled equivalent to
