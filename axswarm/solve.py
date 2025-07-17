@@ -7,9 +7,11 @@ import jax.numpy as jp
 from jax import Array
 from numpy.typing import NDArray
 
-from .constraint import EqualityConstraint, InequalityConstraint, PolarInequalityConstraint
-from .data import SolverData
-from .settings import SolverSettings
+from axswarm.constraint import EqualityConstraint, InequalityConstraint, PolarInequalityConstraint
+from axswarm.data import SolverData
+from axswarm.settings import SolverSettings
+
+ACTIVE_RANGE = -1.0
 
 
 def solve(
@@ -203,7 +205,7 @@ def _add_pos_limit_constraint(data: SolverData, settings: SolverSettings, x_0: A
     lower = -jp.tile(settings.pos_min, settings.K + 1) + data.matrices.M_p_S_x @ x_0
     h_p = jp.concatenate([upper, lower])
     constr = InequalityConstraint.init(
-        data.matrices.G_p, h_p, settings.pos_limit_tol, active_range=-0.25
+        data.matrices.G_p, h_p, settings.pos_limit_tol, active_range=ACTIVE_RANGE
     )
     return data.replace(max_pos_constraint=constr)
 
@@ -215,7 +217,7 @@ def _add_vel_limit_constraint(data: SolverData, settings: SolverSettings, x_0: A
         c_v,
         upr_bound=settings.vel_max,
         tol=settings.vel_limit_tol,
-        active_range=-0.25,
+        active_range=ACTIVE_RANGE,
     )
     return data.replace(max_vel_constraint=constr)
 
@@ -224,7 +226,7 @@ def _add_acc_limit_constraint(data: SolverData, settings: SolverSettings, x_0: A
     c_a = data.matrices.M_a_S_x_prime @ x_0
     G = data.matrices.M_a_S_u_prime_W_input
     constr = PolarInequalityConstraint.init(
-        G, c_a, upr_bound=settings.acc_max, tol=settings.acc_limit_tol, active_range=-0.25
+        G, c_a, upr_bound=settings.acc_max, tol=settings.acc_limit_tol, active_range=ACTIVE_RANGE
     )
     return data.replace(max_acc_constraint=constr)
 
@@ -250,7 +252,7 @@ def _add_collision_constraint(data: SolverData, settings: SolverSettings, x_0: A
         lwr_bound=1.0,
         tol=settings.collision_tol,
         mask=mask,
-        active_range=-0.25,
+        active_range=ACTIVE_RANGE,
     )
     return data.replace(collision_constraints=constr)
 
