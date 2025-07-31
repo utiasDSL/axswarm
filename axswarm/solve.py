@@ -11,7 +11,7 @@ from axswarm.constraint import EqualityConstraint, InequalityConstraint, PolarIn
 from axswarm.data import SolverData
 from axswarm.settings import SolverSettings
 
-ACTIVE_RANGE = -1.0
+ACTIVE_RANGE = -10.0
 
 
 def solve(

@@ -123,18 +123,15 @@ def simulate_axswarm(sim, waypoints, render=False) -> NDArray:
     for step in range(n_steps):
         t = step / settings.freq
 
-        # states = np.concat((solver_data.u_pos[:, 0], solver_data.u_vel[:, 0]), axis=-1)
-        pos, vel = (np.asarray(sim.data.states.pos[0]), np.asarray(sim.data.states.vel[0]))
+        pos, vel = np.asarray(sim.data.states.pos[0]), np.asarray(sim.data.states.vel[0])
         states = np.concat((pos, vel), axis=-1)
         success, _, solver_data = solve(states, t, solver_data, settings)
         if not all(success):
             logger.warning("Solve failed")
 
         solver_data = solver_data.step(solver_data)
-        # Switch to u_pos okay?
-        # control[0, :, :3] = solver_data.pos[:, 1]
-        control[0, :, :3] = solver_data.u_pos[:, 1]
-        control[0, :, 3:6] = solver_data.u_vel[:, 1]
+        control[0, :, :3] = solver_data.u_pos[:, 0]
+        control[0, :, 3:6] = solver_data.u_vel[:, 0]
 
         sim.state_control(control)
         sim.step(sim.freq // settings.freq)

@@ -11,12 +11,12 @@ SolverSettings:
   max_collisions: 2
 
   # Weights
-  pos_weight: 1.0  # Weight of the position tracking objective in the cost
+  pos_weight: 6.0  # Weight of the position tracking objective in the cost
   vel_weight: 0.0  # Weight of the velocity tracking objective in the cost
   acc_weight: 0.0  # Weight of the acceleration tracking objective in the cost
-  smoothness_weight: 10.0  # Weight of the smoothness objective in the cost
-  input_smoothness_weight: 10.0  # Weight of the input smoothness objective in the cost
-  input_continuity_weight: 1.0  # Weight of the input continuity objective in the cost
+  smoothness_weight: 5.0  # Weight of the smoothness objective in the cost
+  input_smoothness_weight: 0.5  # Weight of the input smoothness objective in the cost
+  input_continuity_weight: 2.0  # Weight of the input continuity objective in the cost
 
   # Limits
   pos_min: [-2, -2, 0.1]  # Minimum position of the AMSwarm drones
